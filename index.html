@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Control</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#4CAF50">
 <style>
 * {margin:0; padding:0; box-sizing:border-box; font-family: Arial,sans-serif;}
 body {background-color:#f4f4f9; display:flex; justify-content:center; align-items:flex-start; padding:20px; color:#333;}
@@ -30,8 +32,6 @@ th {background-color:#f0f0f0;}
 #backButton:hover {background-color:#f0f0f0;}
 #signatureContainer {display:none; margin-top:20px; text-align:center;}
 #signaturePad {border:1px solid #ccc; cursor:crosshair; width:100%; height:150px;}
-
-/* Responsive para móviles */
 @media (max-width: 500px) {
     h1, h2 {font-size:1.5rem;}
     button {font-size:14px; padding:10px;}
@@ -46,7 +46,6 @@ th {background-color:#f0f0f0;}
     <h1>Control</h1>
     <button id="loginButton" onclick="showLoginForm()">Ingresar</button>
 
-    <!-- Formulario de login -->
     <form id="loginForm" onsubmit="return authenticate(event)">
         <input type="text" id="personName" placeholder="Nombre completo" required>
         <select id="role" required>
@@ -62,13 +61,11 @@ th {background-color:#f0f0f0;}
 
     <div class="active-user" id="activeUser"></div>
 
-    <!-- Menú -->
     <div class="menu" id="menu">
         <button onclick="showMaterialForm()">Materiales</button>
         <button>Mantenimiento</button>
     </div>
 
-    <!-- Formulario de materiales -->
     <form id="materialForm" onsubmit="return submitMaterial(event)">
         <h2>Registro de Materiales</h2>
         <input type="text" id="fullName" placeholder="Nombre completo" required>
@@ -78,10 +75,8 @@ th {background-color:#f0f0f0;}
         <button type="submit" style="background-color:#4CAF50; color:white;">Registrar</button>
     </form>
 
-    <!-- Botón volver -->
     <button id="backButton" onclick="backToMenu()">&larr; Volver</button>
 
-    <!-- Contenedor de firma -->
     <div id="signatureContainer">
         <h2>Firma del responsable</h2>
         <canvas id="signaturePad"></canvas><br>
@@ -89,7 +84,6 @@ th {background-color:#f0f0f0;}
         <button onclick="saveSignature()" style="width:48%; display:inline-block;">Guardar Firma</button>
     </div>
 
-    <!-- Contenedor de registros -->
     <div id="recordsTableContainer">
         <div id="recordsTable"></div>
         <button id="viewRecordsBtn" onclick="viewRecords()">Ver todos los registros</button>
@@ -107,7 +101,6 @@ let records = JSON.parse(localStorage.getItem('records')) || [];
 let currentUser = { name:'', role:'' };
 let tempRecord = null;
 
-// Login
 function showLoginForm() {
     document.getElementById('loginButton').style.display = 'none';
     document.getElementById('loginForm').style.display = 'flex';
@@ -118,7 +111,6 @@ function authenticate(event) {
     const personName = document.getElementById('personName').value;
     const role = document.getElementById('role').value;
     const password = document.getElementById('password').value;
-
     const user = roles.find(u => u.role === role && u.password === password);
     if(user){
         currentUser = { name:personName, role:role };
@@ -131,7 +123,6 @@ function authenticate(event) {
     }
 }
 
-// Mostrar formulario de materiales
 function showMaterialForm() {
     document.getElementById('materialForm').style.display = 'flex';
     document.getElementById('menu').style.display = 'none';
@@ -141,37 +132,52 @@ function showMaterialForm() {
     document.getElementById('fullName').value = '';
     document.getElementById('material').value = '';
     document.getElementById('branch').value = '';
-    const now = new Date();
-    document.getElementById('dateTime').value = now.toLocaleString();
+    document.getElementById('dateTime').value = new Date().toLocaleString();
 }
 
-// Registrar material y mostrar firma
 function submitMaterial(event) {
     event.preventDefault();
     const fullName = document.getElementById('fullName').value;
     const material = document.getElementById('material').value;
     const dateTime = document.getElementById('dateTime').value;
     const branch = document.getElementById('branch').value;
-
-    if(fullName.trim()===""){
-        alert("Por favor, ingrese el nombre completo.");
-        return;
-    }
-
+    if(fullName.trim()===""){ alert("Ingrese nombre completo"); return; }
     tempRecord = { fullName, role: currentUser.role, material, dateTime, branch };
     document.getElementById('materialForm').style.display = 'none';
     document.getElementById('signatureContainer').style.display = 'block';
 }
 
-// Configurar canvas para firma
+// Canvas firma
 const canvas = document.getElementById('signaturePad');
 const ctx = canvas.getContext('2d');
 let drawing = false;
 
+// Mouse
 canvas.addEventListener('mousedown',()=>drawing=true);
 canvas.addEventListener('mouseup',()=>drawing=false);
 canvas.addEventListener('mouseleave',()=>drawing=false);
 canvas.addEventListener('mousemove',draw);
+
+// Touch
+canvas.addEventListener('touchstart',(e)=>{
+    e.preventDefault();
+    drawing=true;
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    ctx.beginPath();
+    ctx.moveTo(touch.clientX - rect.left, touch.clientY - rect.top);
+});
+canvas.addEventListener('touchend',(e)=>{ e.preventDefault(); drawing=false; ctx.beginPath(); });
+canvas.addEventListener('touchmove',(e)=>{
+    e.preventDefault();
+    if(!drawing) return;
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    ctx.lineTo(touch.clientX - rect.left, touch.clientY - rect.top);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(touch.clientX - rect.left, touch.clientY - rect.top);
+});
 
 function draw(e){
     if(!drawing) return;
@@ -185,14 +191,10 @@ function draw(e){
     ctx.moveTo(e.clientX-rect.left, e.clientY-rect.top);
 }
 
-function clearSignature(){
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-}
+function clearSignature(){ ctx.clearRect(0,0,canvas.width,canvas.height); }
 
-// Guardar firma y completar registro
 function saveSignature(){
-    const signatureData = canvas.toDataURL();
-    tempRecord.signature = signatureData;
+    tempRecord.signature = canvas.toDataURL();
     records.push(tempRecord);
     localStorage.setItem('records', JSON.stringify(records));
     tempRecord = null;
@@ -202,7 +204,6 @@ function saveSignature(){
     alert("Registro con firma completado!");
 }
 
-// Volver al menú principal
 function backToMenu(){
     document.getElementById('materialForm').style.display='none';
     document.getElementById('signatureContainer').style.display='none';
@@ -212,9 +213,8 @@ function backToMenu(){
     document.getElementById('viewRecordsBtn').style.display='block';
 }
 
-// Ver todos los registros
 function viewRecords(){
-    if(records.length===0){alert('No hay registros para mostrar.'); return;}
+    if(records.length===0){alert('No hay registros'); return;}
     let html=`<h2>Todos los Registros</h2><table>
         <tr><th>Nombre</th><th>Rol</th><th>Material</th><th>Sucursal</th><th>Fecha y hora</th><th>Firma</th></tr>`;
     records.forEach(r=>{
@@ -236,3 +236,4 @@ function viewRecords(){
 </script>
 </body>
 </html>
+
