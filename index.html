@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Control</title>
+<style>
+* {margin:0; padding:0; box-sizing:border-box; font-family: Arial,sans-serif;}
+body {background-color:#f4f4f9; display:flex; justify-content:center; align-items:flex-start; padding:20px; color:#333;}
+.container {position:relative; background-color:#fff; padding:30px; border-radius:12px; box-shadow:0 10px 20px rgba(0,0,0,0.1); width:90%; max-width:550px; margin-bottom:50px;}
+h1, h2 {text-align:center; margin-bottom:20px; color:#4a4a4a;}
+button {padding:12px; width:100%; border:none; border-radius:8px; cursor:pointer; font-size:16px; transition:0.3s;}
+button:hover {opacity:0.9;}
+#loginButton {background-color:#4CAF50; color:white;}
+form {display:none; flex-direction:column; gap:15px;}
+input, select {padding:10px; border-radius:6px; border:1px solid #ccc; font-size:14px; width:100%;}
+.menu {display:none; flex-direction:column; gap:15px; margin-top:20px;}
+.menu button {background-color:#2196F3; color:white;}
+.active-user {text-align:center; margin:15px 0; font-weight:bold; color:#ff5722;}
+.error {color:red; text-align:center;}
+table {width:100%; border-collapse: collapse; margin-top:15px; word-break:break-word;}
+th, td {border:1px solid #ccc; padding:8px; text-align:center;}
+th {background-color:#f0f0f0;}
+#viewRecordsBtn {margin-top:10px; display:none;}
+#backButton {
+    position:absolute; top:10px; left:10px; padding:6px 12px; border-radius:6px;
+    background-color:white; color:black; border:1px solid #ccc; display:none;
+    width:auto; font-size:14px; cursor:pointer;
+}
+#backButton:hover {background-color:#f0f0f0;}
+#signatureContainer {display:none; margin-top:20px; text-align:center;}
+#signaturePad {border:1px solid #ccc; cursor:crosshair; width:100%; height:150px;}
+
+/* Responsive para móviles */
+@media (max-width: 500px) {
+    h1, h2 {font-size:1.5rem;}
+    button {font-size:14px; padding:10px;}
+    input, select {font-size:14px; padding:8px;}
+    #signaturePad {height:120px;}
+    table th, table td {font-size:12px; padding:6px;}
+}
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>Control</h1>
+    <button id="loginButton" onclick="showLoginForm()">Ingresar</button>
+
+    <!-- Formulario de login -->
+    <form id="loginForm" onsubmit="return authenticate(event)">
+        <input type="text" id="personName" placeholder="Nombre completo" required>
+        <select id="role" required>
+            <option value="" disabled selected>Seleccione rol</option>
+            <option value="Jefe">Jefe</option>
+            <option value="Encargado">Encargado</option>
+            <option value="Supervisor">Supervisor</option>
+        </select>
+        <input type="password" id="password" placeholder="Contraseña" required>
+        <button type="submit" style="background-color:#4CAF50; color:white;">Entrar</button>
+        <div class="error" id="errorMsg"></div>
+    </form>
+
+    <div class="active-user" id="activeUser"></div>
+
+    <!-- Menú -->
+    <div class="menu" id="menu">
+        <button onclick="showMaterialForm()">Materiales</button>
+        <button>Mantenimiento</button>
+    </div>
+
+    <!-- Formulario de materiales -->
+    <form id="materialForm" onsubmit="return submitMaterial(event)">
+        <h2>Registro de Materiales</h2>
+        <input type="text" id="fullName" placeholder="Nombre completo" required>
+        <input type="text" id="material" placeholder="Material que llevará" required>
+        <input type="text" id="dateTime" placeholder="Fecha y hora" readonly>
+        <input type="text" id="branch" placeholder="Sucursal" required>
+        <button type="submit" style="background-color:#4CAF50; color:white;">Registrar</button>
+    </form>
+
+    <!-- Botón volver -->
+    <button id="backButton" onclick="backToMenu()">&larr; Volver</button>
+
+    <!-- Contenedor de firma -->
+    <div id="signatureContainer">
+        <h2>Firma del responsable</h2>
+        <canvas id="signaturePad"></canvas><br>
+        <button onclick="clearSignature()" style="width:48%; display:inline-block;">Borrar</button>
+        <button onclick="saveSignature()" style="width:48%; display:inline-block;">Guardar Firma</button>
+    </div>
+
+    <!-- Contenedor de registros -->
+    <div id="recordsTableContainer">
+        <div id="recordsTable"></div>
+        <button id="viewRecordsBtn" onclick="viewRecords()">Ver todos los registros</button>
+    </div>
+</div>
+
+<script>
+const roles = [
+    { role: 'Jefe', password: '1234' },
+    { role: 'Encargado', password: 'abcd' },
+    { role: 'Supervisor', password: 'pass' },
+];
+
+let records = JSON.parse(localStorage.getItem('records')) || [];
+let currentUser = { name:'', role:'' };
+let tempRecord = null;
+
+// Login
+function showLoginForm() {
+    document.getElementById('loginButton').style.display = 'none';
+    document.getElementById('loginForm').style.display = 'flex';
+}
+
+function authenticate(event) {
+    event.preventDefault();
+    const personName = document.getElementById('personName').value;
+    const role = document.getElementById('role').value;
+    const password = document.getElementById('password').value;
+
+    const user = roles.find(u => u.role === role && u.password === password);
+    if(user){
+        currentUser = { name:personName, role:role };
+        document.getElementById('activeUser').textContent = `Bienvenido, ${personName} (${role})`;
+        document.getElementById('menu').style.display = 'flex';
+        document.getElementById('loginForm').style.display = 'none';
+        document.getElementById('errorMsg').textContent = '';
+    } else {
+        document.getElementById('errorMsg').textContent = 'Rol o contraseña incorrectos';
+    }
+}
+
+// Mostrar formulario de materiales
+function showMaterialForm() {
+    document.getElementById('materialForm').style.display = 'flex';
+    document.getElementById('menu').style.display = 'none';
+    document.getElementById('viewRecordsBtn').style.display = 'none';
+    document.getElementById('backButton').style.display = 'block';
+    document.getElementById('recordsTable').innerHTML = '';
+    document.getElementById('fullName').value = '';
+    document.getElementById('material').value = '';
+    document.getElementById('branch').value = '';
+    const now = new Date();
+    document.getElementById('dateTime').value = now.toLocaleString();
+}
+
+// Registrar material y mostrar firma
+function submitMaterial(event) {
+    event.preventDefault();
+    const fullName = document.getElementById('fullName').value;
+    const material = document.getElementById('material').value;
+    const dateTime = document.getElementById('dateTime').value;
+    const branch = document.getElementById('branch').value;
+
+    if(fullName.trim()===""){
+        alert("Por favor, ingrese el nombre completo.");
+        return;
+    }
+
+    tempRecord = { fullName, role: currentUser.role, material, dateTime, branch };
+    document.getElementById('materialForm').style.display = 'none';
+    document.getElementById('signatureContainer').style.display = 'block';
+}
+
+// Configurar canvas para firma
+const canvas = document.getElementById('signaturePad');
+const ctx = canvas.getContext('2d');
+let drawing = false;
+
+canvas.addEventListener('mousedown',()=>drawing=true);
+canvas.addEventListener('mouseup',()=>drawing=false);
+canvas.addEventListener('mouseleave',()=>drawing=false);
+canvas.addEventListener('mousemove',draw);
+
+function draw(e){
+    if(!drawing) return;
+    const rect = canvas.getBoundingClientRect();
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = 'black';
+    ctx.lineTo(e.clientX-rect.left, e.clientY-rect.top);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(e.clientX-rect.left, e.clientY-rect.top);
+}
+
+function clearSignature(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+}
+
+// Guardar firma y completar registro
+function saveSignature(){
+    const signatureData = canvas.toDataURL();
+    tempRecord.signature = signatureData;
+    records.push(tempRecord);
+    localStorage.setItem('records', JSON.stringify(records));
+    tempRecord = null;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    document.getElementById('signatureContainer').style.display = 'none';
+    document.getElementById('viewRecordsBtn').style.display = 'block';
+    alert("Registro con firma completado!");
+}
+
+// Volver al menú principal
+function backToMenu(){
+    document.getElementById('materialForm').style.display='none';
+    document.getElementById('signatureContainer').style.display='none';
+    document.getElementById('recordsTable').innerHTML='';
+    document.getElementById('menu').style.display='flex';
+    document.getElementById('backButton').style.display='none';
+    document.getElementById('viewRecordsBtn').style.display='block';
+}
+
+// Ver todos los registros
+function viewRecords(){
+    if(records.length===0){alert('No hay registros para mostrar.'); return;}
+    let html=`<h2>Todos los Registros</h2><table>
+        <tr><th>Nombre</th><th>Rol</th><th>Material</th><th>Sucursal</th><th>Fecha y hora</th><th>Firma</th></tr>`;
+    records.forEach(r=>{
+        html+=`<tr>
+            <td>${r.fullName}</td>
+            <td>${r.role}</td>
+            <td>${r.material}</td>
+            <td>${r.branch}</td>
+            <td>${r.dateTime}</td>
+            <td>${r.signature?`<img src="${r.signature}" width="100">`:'No firmó'}</td>
+        </tr>`;
+    });
+    html+=`</table>`;
+    document.getElementById('recordsTable').innerHTML=html;
+    document.getElementById('backButton').style.display='block';
+    document.getElementById('viewRecordsBtn').style.display='none';
+    document.getElementById('menu').style.display='none';
+}
+</script>
+</body>
+</html>
